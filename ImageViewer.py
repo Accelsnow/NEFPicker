@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# ImageViewer class based on Akira https://github.com/ImagingSolution/PythonImageViewer
 # Modifications by Adrian Zhao on 2025-03-04
 
 from __future__ import annotations
