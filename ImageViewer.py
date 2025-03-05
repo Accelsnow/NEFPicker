@@ -27,12 +27,11 @@ from ImageHandler import ImageHandler, ImageObject
 
 class ImageViewer(ctk.CTk):
     def __init__(self, nef_folder="./NEF", jpg_folder="./JPG", opt_nef_folder="./SEL_NEF", opt_jpg_folder="./SEL_JPG",
-                 del_nef_folder="./DEL_NEF", del_jpg_folder="./DEL_JPG"):
+                 del_folder="./DEL"):
         super().__init__()
 
         print("Reading all images ...")
-        self.img_it = ImageHandler(nef_folder, jpg_folder, opt_nef_folder, opt_jpg_folder, del_nef_folder,
-                                   del_jpg_folder)
+        self.img_it = ImageHandler(nef_folder, jpg_folder, opt_nef_folder, opt_jpg_folder, del_folder)
 
         if not self.img_it.has_next():
             msg = CTkMessagebox(title="Error",
