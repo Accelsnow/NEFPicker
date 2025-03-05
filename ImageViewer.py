@@ -18,10 +18,12 @@
 from __future__ import annotations
 import math
 import numpy as np
+import sys
 import customtkinter as ctk
 from PIL import Image, ImageTk
 from CTkMessagebox import CTkMessagebox
 from ImageHandler import ImageHandler, ImageObject
+
 
 class ImageViewer(ctk.CTk):
     def __init__(self, nef_folder="./NEF", jpg_folder="./JPG", opt_nef_folder="./SEL_NEF", opt_jpg_folder="./SEL_JPG",
@@ -33,7 +35,12 @@ class ImageViewer(ctk.CTk):
                                    del_jpg_folder)
 
         if not self.img_it.has_next():
-            raise ValueError("No image available.")
+            msg = CTkMessagebox(title="Error",
+                                message=f"No image found. Images should be placed in {nef_folder} (for NEF) and {jpg_folder} (for JPG).",
+                                icon="cancel")
+            msg.get()
+            self.quit()
+            sys.exit(0)
 
         print("Image read complete!")
 
@@ -69,15 +76,21 @@ class ImageViewer(ctk.CTk):
                                          state=ctk.DISABLED)
         self.button_prev.grid(row=0, column=0, padx=20, pady=20, sticky="w")
 
-        self.button_keep_jpg = ctk.CTkButton(frame_ctrl, text="Keep JPG", anchor=ctk.CENTER, command=self.keep_jpg, state=ctk.DISABLED)
-        self.button_keep_jpg.grid(row=0, column=1, padx=20, pady=20, sticky="w")
+        self.button_del_both = ctk.CTkButton(frame_ctrl, text="Remove", anchor=ctk.CENTER, command=self.del_both,
+                                             state=ctk.DISABLED)
+        self.button_del_both.grid(row=0, column=1, padx=20, pady=20, sticky="we")
 
-        self.button_keep_nef = ctk.CTkButton(frame_ctrl, text="Keep NEF", anchor=ctk.CENTER, command=self.keep_nef, state=ctk.DISABLED)
-        self.button_keep_nef.grid(row=0, column=2, padx=20, pady=20, sticky="w")
+        self.button_keep_jpg = ctk.CTkButton(frame_ctrl, text="Keep JPG", anchor=ctk.CENTER, command=self.keep_jpg,
+                                             state=ctk.DISABLED)
+        self.button_keep_jpg.grid(row=0, column=2, padx=20, pady=20, sticky="we")
+
+        self.button_keep_nef = ctk.CTkButton(frame_ctrl, text="Keep NEF", anchor=ctk.CENTER, command=self.keep_nef,
+                                             state=ctk.DISABLED)
+        self.button_keep_nef.grid(row=0, column=3, padx=20, pady=20, sticky="we")
 
         self.button_next = ctk.CTkButton(frame_ctrl, text=">> Next", anchor=ctk.E, command=self.show_next,
                                          state=ctk.NORMAL)
-        self.button_next.grid(row=0, column=3, padx=20, pady=20, sticky="e")
+        self.button_next.grid(row=0, column=4, padx=20, pady=20, sticky="e")
 
         frame_ctrl.pack(side=ctk.BOTTOM, fill=ctk.X)
 
@@ -108,11 +121,9 @@ class ImageViewer(ctk.CTk):
         self.set_image(self.img_it.next_img())
         self.update_buttons()
 
-    def keep_jpg(self):
-        self.pil_image = None
-        self.img_it.op_keep_jpg()
+    def _prog_or_exit_no_img(self):
         if self.img_it.curr_img() is None:
-            msg = CTkMessagebox(title="Info", message="All images processed!", icon="info")
+            msg = CTkMessagebox(title="Info", message="No image left! Exiting ...", icon="info")
             # CTkMessagebox(title="Error", message="Something went wrong!!!", icon="cancel")
             if msg.get():
                 self.quit()
@@ -120,17 +131,20 @@ class ImageViewer(ctk.CTk):
             self.set_image(self.img_it.curr_img())
             self.update_buttons()
 
+    def keep_jpg(self):
+        self.pil_image = None
+        self.img_it.op_keep_jpg()
+        self._prog_or_exit_no_img()
+
     def keep_nef(self):
         self.pil_image = None
         self.img_it.op_keep_nef()
-        if self.img_it.curr_img() is None:
-            msg = CTkMessagebox(title="Info", message="All images processed!", icon="info")
-            # CTkMessagebox(title="Error", message="Something went wrong!!!", icon="cancel")
-            if msg.get():
-                self.quit()
-        else:
-            self.set_image(self.img_it.curr_img())
-            self.update_buttons()
+        self._prog_or_exit_no_img()
+
+    def del_both(self):
+        self.pil_image = None
+        self.img_it.op_del_both()
+        self._prog_or_exit_no_img()
 
     def update_buttons(self):
         if not self.img_it.has_prev():
@@ -143,15 +157,20 @@ class ImageViewer(ctk.CTk):
         else:
             self.button_next.configure(state=ctk.NORMAL)
 
-        if not self.img_it.curr_img().has_jpg():
+        if not self.img_it.curr_img() or not self.img_it.curr_img().has_jpg():
             self.button_keep_jpg.configure(state=ctk.DISABLED)
         else:
             self.button_keep_jpg.configure(state=ctk.NORMAL)
 
-        if not self.img_it.curr_img().has_nef():
+        if not self.img_it.curr_img() or not self.img_it.curr_img().has_nef():
             self.button_keep_nef.configure(state=ctk.DISABLED)
         else:
             self.button_keep_nef.configure(state=ctk.NORMAL)
+
+        if not not self.img_it.curr_img():
+            self.button_del_both.configure(state=ctk.DISABLED)
+        else:
+            self.button_del_both.configure(state=ctk.NORMAL)
 
     def set_image(self, img_obj: ImageObject):
         # PIL.Imageで開く

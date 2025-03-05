@@ -2,14 +2,22 @@ from __future__ import annotations
 from typing import Optional
 import io
 import os
+import sys
 import shutil
 import glob
 import rawpy
 from PIL import Image
+from CTkMessagebox import CTkMessagebox
 
+def disp_error(msg: str, exit_after: bool = False):
+    msg = CTkMessagebox(title="Error", message=msg, icon="cancel")
+    msg.get()
+    if exit_after:
+        sys.exit(1)
 
 class ImageObject:
     def __init__(self, nef_file: str = None, jpg_file: str = None):
+        self._valid = False
         self.nef_file = nef_file
         self.jpg_file = jpg_file
         self.pil = None
@@ -27,7 +35,11 @@ class ImageObject:
                 elif thumb.format == rawpy.ThumbFormat.BITMAP:
                     self.pil = Image.fromarray(thumb.data)
                 else:
-                    raise NotImplementedError(f"Unsupported thumbnail format {str(thumb.format)}")
+                    msg = CTkMessagebox(title="Unknown NEF Thumb Format", message=f"Unsupported thumbnail format {str(thumb.format)} in NEF file: {self.nef_file}.",
+                                        icon="warning", option_1="Exit", option_2="Continue")
+                    if msg.get() == "Exit":
+                        sys.exit(1)
+                    return
         else:
             raise ValueError("Neither NEF nor JPEG file is present.")
 
@@ -46,23 +58,34 @@ class ImageObject:
         else:
             raise ValueError("Neither NEF nor JPEG file is present.")
 
+        self._valid = True
+
     def has_nef(self) -> bool:
         return self.nef_file is not None
 
     def has_jpg(self) -> bool:
         return self.jpg_file is not None
 
+    def is_valid(self) -> bool:
+        return self._valid
+
     def close(self):
         if self.pil is not None:
             self.pil.close()
             self.pil = None
+        return self._valid
 
+def is_jpg_file(filename: str) -> bool:
+    return filename.upper().endswith(".JPG") or filename.upper().endswith(".JPEG")
+
+def is_nef_file(filename: str) -> bool:
+    return filename.upper().endswith(".NEF")
 
 class ImageHandler:
     def __init__(self, nef_folder="./NEF", jpg_folder="./JPG", opt_nef_folder="./SEL_NEF", opt_jpg_folder="./SEL_JPG",
                  del_nef_folder="./DEL_NEF", del_jpg_folder="./DEL_JPG"):
-        nef_files = glob.glob(os.path.join(nef_folder, '*.NEF'))
-        jpg_files = glob.glob(os.path.join(jpg_folder, '*.JPG'))
+        nef_files = [f for f in glob.glob(os.path.join(nef_folder, '*')) if is_nef_file(f)]
+        jpg_files = [f for f in glob.glob(os.path.join(jpg_folder, '*')) if is_jpg_file(f)]
         os.makedirs(opt_jpg_folder, exist_ok=True)
         os.makedirs(opt_nef_folder, exist_ok=True)
         os.makedirs(del_jpg_folder, exist_ok=True)
@@ -85,27 +108,32 @@ class ImageHandler:
         i = 0
         while i < len(all_files):
             jpg_file, nef_file = None, None
+            istep = 1
 
-            if all_files[i].endswith(".JPG"):
+            if is_jpg_file(all_files[i]):
                 jpg_file = all_files[i]
-            elif all_files[i].endswith(".NEF"):
+            elif is_nef_file(all_files[i]):
                 nef_file = all_files[i]
             else:
                 raise ValueError(f"Unsupported file format {all_files[i]}.")
 
             if i + 1 < len(all_files) and os.path.basename(all_files[i])[:-4] == os.path.basename(all_files[i + 1])[
                                                                                  :-4]:
-                if all_files[i + 1].endswith(".NEF"):
+                if is_nef_file(all_files[i + 1]):
                     assert nef_file is None and jpg_file is not None
                     nef_file = all_files[i + 1]
-                elif all_files[i + 1].endswith(".JPG"):
+                elif is_jpg_file(all_files[i + 1]):
                     assert jpg_file is None and nef_file is not None
                     jpg_file = all_files[i + 1]
                 else:
                     raise ValueError(f"Unsupported file format {all_files[i + 1]}.")
-                i += 1
+                istep = 2
 
             img_obj = ImageObject(nef_file=nef_file, jpg_file=jpg_file)
+
+            if not img_obj.is_valid():
+                i += 1
+                continue
 
             if self._head is None:
                 self._head = img_obj
@@ -115,7 +143,7 @@ class ImageHandler:
                 img_obj.prev = prev
 
             prev = img_obj
-            i += 1
+            i += istep
             self._org_size += 1
 
         self._curr_size = self._org_size
@@ -163,6 +191,15 @@ class ImageHandler:
         assert self._curr.has_nef()
         self._curr.close()
         shutil.move(self._curr.nef_file, self._opt_nef_folder)
+        if self._curr.has_jpg():
+            shutil.move(self._curr.jpg_file, self._del_jpg_folder)
+        self._remove_curr()
+
+    def op_del_both(self):
+        assert self._curr is not None
+        self._curr.close()
+        if self._curr.has_nef():
+            shutil.move(self._curr.nef_file, self._del_nef_folder)
         if self._curr.has_jpg():
             shutil.move(self._curr.jpg_file, self._del_jpg_folder)
         self._remove_curr()
