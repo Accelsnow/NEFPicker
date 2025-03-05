@@ -83,21 +83,18 @@ def is_nef_file(filename: str) -> bool:
 
 class ImageHandler:
     def __init__(self, nef_folder="./NEF", jpg_folder="./JPG", opt_nef_folder="./SEL_NEF", opt_jpg_folder="./SEL_JPG",
-                 del_nef_folder="./DEL_NEF", del_jpg_folder="./DEL_JPG"):
+                 del_folder="./DEL"):
         nef_files = [f for f in glob.glob(os.path.join(nef_folder, '*')) if is_nef_file(f)]
         jpg_files = [f for f in glob.glob(os.path.join(jpg_folder, '*')) if is_jpg_file(f)]
         os.makedirs(opt_jpg_folder, exist_ok=True)
         os.makedirs(opt_nef_folder, exist_ok=True)
-        os.makedirs(del_jpg_folder, exist_ok=True)
-        os.makedirs(del_nef_folder, exist_ok=True)
+        os.makedirs(del_folder, exist_ok=True)
         assert os.path.isdir(opt_nef_folder)
         assert os.path.isdir(opt_jpg_folder)
-        assert os.path.isdir(del_nef_folder)
-        assert os.path.isdir(del_jpg_folder)
+        assert os.path.isdir(del_folder)
         self._opt_nef_folder = opt_nef_folder
         self._opt_jpg_folder = opt_jpg_folder
-        self._del_nef_folder = del_nef_folder
-        self._del_jpg_folder = del_jpg_folder
+        self._del_folder = del_folder
 
         all_files = sorted(nef_files + jpg_files, key=lambda x: os.path.basename(x))
         self._org_size = 0
@@ -183,7 +180,7 @@ class ImageHandler:
         self._curr.close()
         shutil.move(self._curr.jpg_file, self._opt_jpg_folder)
         if self._curr.has_nef():
-            shutil.move(self._curr.nef_file, self._del_nef_folder)
+            shutil.move(self._curr.nef_file, self._del_folder)
         self._remove_curr()
 
     def op_keep_nef(self):
@@ -192,16 +189,16 @@ class ImageHandler:
         self._curr.close()
         shutil.move(self._curr.nef_file, self._opt_nef_folder)
         if self._curr.has_jpg():
-            shutil.move(self._curr.jpg_file, self._del_jpg_folder)
+            shutil.move(self._curr.jpg_file, self._del_folder)
         self._remove_curr()
 
     def op_del_both(self):
         assert self._curr is not None
         self._curr.close()
         if self._curr.has_nef():
-            shutil.move(self._curr.nef_file, self._del_nef_folder)
+            shutil.move(self._curr.nef_file, self._del_folder)
         if self._curr.has_jpg():
-            shutil.move(self._curr.jpg_file, self._del_jpg_folder)
+            shutil.move(self._curr.jpg_file, self._del_folder)
         self._remove_curr()
 
     def _remove_curr(self) -> Optional[ImageObject]:
