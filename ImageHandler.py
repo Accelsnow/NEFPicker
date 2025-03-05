@@ -3,7 +3,6 @@ from typing import Optional
 import io
 import os
 import sys
-import shutil
 import glob
 import rawpy
 import exiftool
@@ -129,6 +128,10 @@ def is_nef_file(filename: str) -> bool:
     return filename.upper().endswith(".NEF")
 
 
+def no_ext_fname(path: str) -> str:
+    return ".".join(os.path.basename(path).split(".")[:-1])
+
+
 class ImageHandler:
     def __init__(self, nef_folder="./NEF", jpg_folder="./JPG", opt_nef_folder="./SEL_NEF", opt_jpg_folder="./SEL_JPG",
                  del_folder="./DEL"):
@@ -162,8 +165,7 @@ class ImageHandler:
             else:
                 raise ValueError(f"Unsupported file format {all_files[i]}.")
 
-            if i + 1 < len(all_files) and os.path.basename(all_files[i])[:-4] == os.path.basename(all_files[i + 1])[
-                                                                                 :-4]:
+            if i + 1 < len(all_files) and no_ext_fname(all_files[i]) == no_ext_fname(all_files[i + 1]):
                 if is_nef_file(all_files[i + 1]):
                     assert nef_file is None and jpg_file is not None
                     nef_file = all_files[i + 1]
@@ -222,31 +224,64 @@ class ImageHandler:
             self._curr = self._curr.prev
         return self._curr
 
+    def _rename_mv(self, src_file: str, dest_folder: str):
+        while True:
+            try:
+                if 'date' in self._curr.meta and self._curr.meta['date']:
+                    success = False
+                    for i in range(1, 50):
+                        if i <= 1:
+                            new_filename = f"IMG_{self._curr.meta['date'].strftime('%y%m%d_%H%M%S')}.{src_file.split('.')[-1]}"
+                        else:
+                            new_filename = f"IMG_{self._curr.meta['date'].strftime('%y%m%d_%H%M%S')}({i}).{src_file.split('.')[-1]}"
+
+                        if os.path.exists(os.path.join(dest_folder, new_filename)):
+                            continue
+
+                        os.rename(src_file, os.path.join(dest_folder, new_filename))
+                        success = True
+                        break
+
+                    if not success:
+                        os.rename(src_file, dest_folder)
+                else:
+                    os.rename(src_file, dest_folder)
+
+                break
+            except Exception as e:
+                msg = CTkMessagebox(title="Error",
+                                    message=f"Unable to move file {src_file} to {dest_folder}.\n{str(e)}",
+                                    option_1="Skip", option_2="Retry", icon="cancel")
+                if msg.get() == "Retry":
+                    continue
+                else:
+                    break
+
     def op_keep_jpg(self):
         assert self._curr is not None
         assert self._curr.has_jpg()
         self._curr.close()
-        shutil.move(self._curr.jpg_file, self._opt_jpg_folder)
+        self._rename_mv(self._curr.jpg_file, self._opt_jpg_folder)
         if self._curr.has_nef():
-            shutil.move(self._curr.nef_file, self._del_folder)
+            self._rename_mv(self._curr.nef_file, self._del_folder)
         self._remove_curr()
 
     def op_keep_nef(self):
         assert self._curr is not None
         assert self._curr.has_nef()
         self._curr.close()
-        shutil.move(self._curr.nef_file, self._opt_nef_folder)
+        self._rename_mv(self._curr.nef_file, self._opt_nef_folder)
         if self._curr.has_jpg():
-            shutil.move(self._curr.jpg_file, self._del_folder)
+            self._rename_mv(self._curr.jpg_file, self._del_folder)
         self._remove_curr()
 
     def op_del_both(self):
         assert self._curr is not None
         self._curr.close()
         if self._curr.has_nef():
-            shutil.move(self._curr.nef_file, self._del_folder)
+            self._rename_mv(self._curr.nef_file, self._del_folder)
         if self._curr.has_jpg():
-            shutil.move(self._curr.jpg_file, self._del_folder)
+            self._rename_mv(self._curr.jpg_file, self._del_folder)
         self._remove_curr()
 
     def _remove_curr(self) -> Optional[ImageObject]:

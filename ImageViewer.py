@@ -33,7 +33,7 @@ class ImageViewer(ctk.CTk):
         print("Reading all images ...")
         self.img_it = ImageHandler(nef_folder, jpg_folder, opt_nef_folder, opt_jpg_folder, del_folder)
 
-        if not self.img_it.has_next():
+        if not self.img_it.curr_img():
             msg = CTkMessagebox(title="Error",
                                 message=f"No image found. Images should be placed in {nef_folder} (for NEF) and {jpg_folder} (for JPG).",
                                 icon="cancel")
@@ -43,7 +43,7 @@ class ImageViewer(ctk.CTk):
 
         print("Image read complete!")
 
-        self.geometry("1280x720")
+        self.geometry("1150x840")
 
         self.image = None
         self.pil_image = None  # 表示する画像データ
